@@ -2,11 +2,6 @@
 
 /**
  * هستی — Private AI Assistant (chat interface)
- *
- * The layout is 100% client-side demo wiring. The real data path (per
- * ARCHITECTURE.md) is:  browser → src/app/api/chat → vllm / custom-engine.
- * Until that Route Handler is wired, sending a message plays a mocked
- * local reply so the interface can be explored end-to-end.
  */
 
 import { useEffect, useRef, useState } from "react";
@@ -28,6 +23,8 @@ import {
   Server,
   Sparkles,
   Zap,
+  Copy,
+  Check,
 } from "lucide-react";
 
 const Avatar3D = dynamic(() => import("@/components/Avatar3D"), {
@@ -130,8 +127,6 @@ export default function HomePage() {
   function selectChat(id: string) {
     setActiveChat(id);
     setSidebarOpen(false);
-    // Demo-level behavior: the future persistent thread will load here via the
-    // Route Handler (see ARCHITECTURE.md). For now a fresh thread starts.
     if (timerRef.current) clearTimeout(timerRef.current);
     setMessages([]);
     setInput("");
@@ -139,9 +134,6 @@ export default function HomePage() {
   }
 
   const hasMessages = messages.length > 0;
-
-  // The 3D hero reflects the chat pipeline: thinking while the model is
-  // generating, responding once the assistant has answered, idle otherwise.
   const avatarState: AvatarState = pending ? "thinking" : hasMessages ? "responding" : "idle";
 
   return (
@@ -211,7 +203,6 @@ export default function HomePage() {
         <ModelCard />
       </aside>
 
-      {/* mobile sidebar backdrop */}
       {sidebarOpen && (
         <button
           aria-label="بستن منو"
@@ -283,6 +274,14 @@ function ModelCard() {
 }
 
 function Header({ onToggleSidebar, activeChatTitle }: { onToggleSidebar: () => void; activeChatTitle?: string }) {
+  const [copied, setCopied] = useState(false);
+
+  const copyUrl = () => {
+    navigator.clipboard.writeText(window.location.href);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
+
   return (
     <header className="flex items-center justify-between gap-3 border-b border-white/8 bg-night-900/60 px-4 py-3 backdrop-blur-xl sm:px-6">
       <div className="flex items-center gap-3">
@@ -306,6 +305,26 @@ function Header({ onToggleSidebar, activeChatTitle }: { onToggleSidebar: () => v
       </div>
 
       <div className="flex items-center gap-2">
+        {/* دکمه کپی آدرس سایت */}
+        <button
+          onClick={copyUrl}
+          title="کپی لینک صفحه"
+          className="flex items-center justify-center gap-1.5 rounded-xl border border-white/10 bg-white/5 px-3 py-2 text-[11px] font-semibold text-slate-300 transition hover:bg-white/10 hover:text-white"
+          dir="rtl"
+        >
+          {copied ? (
+            <>
+              <Check size={14} className="text-mint-400" />
+              <span className="hidden sm:inline text-mint-400">کپی شد</span>
+            </>
+          ) : (
+            <>
+              <Copy size={14} />
+              <span className="hidden sm:inline">کپی لینک</span>
+            </>
+          )}
+        </button>
+
         <StatusChip icon={<Server size={13} />} label="vllm · 8000" />
         <StatusChip icon={<Cpu size={13} />} label="engine · 8001" className="hidden md:inline-flex" />
         <StatusChip icon={<Database size={13} />} label="db · 5432" className="hidden lg:inline-flex" />
