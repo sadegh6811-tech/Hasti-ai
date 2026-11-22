@@ -1,0 +1,105 @@
+# =============================================================================
+# هستی — Private AI Assistant
+# Orchestration for the local stack:
+#   vllm (Qwen3-Coder-30B-A3B-AWQ)  :8000
+#   custom-engine (FastAPI /predict):8001
+#   postgres (Next.js frontend data) :5432
+#
+# Usage:
+#   docker compose up -d            # build + start everything
+#   docker compose logs -f custom-engine
+#
+# NOTE: the frontend itself is a Next.js app in this repository. It is meant to
+# run locally (`npm run dev` / `npm run build && npm run start`) or behind a
+# reverse proxy. It is intentionally NOT a service here so the app can be
+# rebuilt independently of the model stack.
+# =============================================================================
+
+services:
+  # ---------------------------------------------------------------- tables --
+  postgres:
+    image: postgres:16-alpine
+    container_name: hesti-postgres
+    restart: unless-stopped
+    # Keep the port off the host by default: nothing should talk to the DB
+    # unless it is in the same Docker network.
+    expose:
+      - "5432"
+    ports:
+      - "127.0.0.1:5432:5432"   # host access for local tooling (drizzle-kit)
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-privateai}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-changeme-please}
+      POSTGRES_DB: ${POSTGRES_DB:-privateai}
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-privateai} -d ${POSTGRES_DB:-privateai}"]
+      interval: 5s
+      timeout: 3s
+      retries: 12
+    networks:
+      - ai-network
+
+  # ------------------------------------------------------------------- LLM --
+  vllm:
+    image: vllm/vllm-openai:latest
+    container_name: hesti-vllm
+    restart: unless-stopped
+    command: >
+      Qwen/Qwen3-Coder-30B-A3B-AWQ
+      --host 0.0.0.0
+      --port 8000
+      --dtype auto
+      --max-model-len 32768
+      --gpu-memory-utilization 0.90
+    ports:
+      # localhost-only on the host; the frontend reaches this on the
+      # ai-network by service name (http://vllm:8000).
+      - "127.0.0.1:8000:8000"
+    volumes:
+      # Model cache lives outside the container so it survives restarts.
+      - vllm-models:/root/.cache/huggingface
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      stack:
+        soft: 67108864
+        hard: 67108864
+    networks:
+      - ai-network
+
+  # -------------------------------------------------------- custom engine --
+  custom-engine:
+    build: ./custom_engine
+    container_name: hesti-custom-engine
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8001:8001"
+    environment:
+      PYTHONUNBUFFERED: "1"
+      APP_NAME: "Hestia Custom Engine"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - ai-network
+
+# ----------------------------------------------------------------- network --
+networks:
+  ai-network:
+    driver: bridge
+
+volumes:
+  postgres-data:
+    driver: local
+  vllm-models:
+    driver: local

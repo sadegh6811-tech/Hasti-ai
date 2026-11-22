@@ -1,0 +1,14 @@
+# JOSS Engine - DO NOT UPLOAD
+custom_engine/main.py
+custom_engine/*.py
+custom_engine/joss/*
+custom_engine/engine.py
+
+# Python cache
+__pycache__/
+*.pyc
+
+# Next.js
+node_modules/
+.next/
+.env
