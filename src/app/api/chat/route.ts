@@ -12,13 +12,16 @@ export async function POST(req: NextRequest) {
     const messages = body.messages || [];
     if (messages.length === 0) return NextResponse.json({ error: "No message" }, { status: 400 });
 
+    if (!GROQ_API_KEY) {
+      throw new Error("کلید GROQ_API_KEY در Vercel تنظیم نشده است!");
+    }
+
     const lastUserMessage = messages[messages.length - 1].content || "";
     const scientificKeywords = ["physics", "math", "equation", "formula", "فرمول", "معادله", "فیزیک", "ریاضی", "دارو", "بعد"];
     const needsJoss = scientificKeywords.some(k => lastUserMessage.toLowerCase().includes(k));
 
     let jossContext = "";
 
-    // ۱. اگر سوال علمی بود، از JOSS داده بگیر
     if (needsJoss) {
       try {
         const jossRes = await fetch(`${JOSS_URL}/predict`, {
@@ -32,19 +35,18 @@ export async function POST(req: NextRequest) {
         }
       } catch (err) {
         console.error("⚠️ JOSS Error:", err);
+        jossContext = `\n\n[خطا در اتصال به JOSS. لطفا تونل Pinggy را چک کنید]`;
       }
     }
 
-    // ۲. ساخت پرامپت سیستم برای مدل زبانی
     const systemPrompt = {
       role: "system",
       content: `You are Hestia (هستی), a private AI assistant. 
 You must answer natively in Persian. Be helpful, polite, and concise.
-If the user asks a scientific question and [JOSS data] is provided below, you MUST use the exact formula and R2 score in your answer. Explain it beautifully.
+If the user asks a scientific question and [JOSS data] is provided below, you MUST use the exact formula and R2 score in your answer.
 ${jossContext}`
     };
 
-    // ۳. ارسال درخواست به مدل زبانی (Groq Llama 3)
     const llmRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
       method: "POST",
       headers: {
@@ -59,9 +61,8 @@ ${jossContext}`
     });
 
     if (!llmRes.ok) {
-      const err = await llmRes.text();
-      console.error("LLM Error:", err);
-      return NextResponse.json({ error: "LLM Server Error" }, { status: 500 });
+      const errText = await llmRes.text();
+      throw new Error(`خطای Groq: ${llmRes.status} - ${errText}`);
     }
 
     const llmData = await llmRes.json();
@@ -69,7 +70,8 @@ ${jossContext}`
 
     return NextResponse.json({ message: assistantReply });
 
-  } catch (error) {
-    return NextResponse.json({ error: "Server Error" }, { status: 500 });
+  } catch (error: any) {
+    console.error("Server Error:", error.message);
+    return NextResponse.json({ error: error.message || "Server Error" }, { status: 500 });
   }
 }

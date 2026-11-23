@@ -69,7 +69,7 @@ export default function HomePage() {
         }),
       });
 
-      if (!res.ok) throw new Error("خطا در دریافت پاسخ");
+      if (!res.ok) const errData = await res.json().catch(() => ({})); throw new Error(errData.error || "خطا در دریافت پاسخ");
 
       const data = await res.json();
       
@@ -80,7 +80,7 @@ export default function HomePage() {
     } catch (error) {
       setMessages((prev) => [
         ...prev,
-        { id: crypto.randomUUID(), role: "assistant", content: "متأسفم، در حال حاضر ارتباط با سرور برقرار نیست.", time: nowTime() },
+        { id: crypto.randomUUID(), role: "assistant", content: error instanceof Error ? `خطا: ${error.message}` : "متأسفم، خطای ناشناخته‌ای رخ داد.", time: nowTime() },
       ]);
     } finally {
       setPending(false);
