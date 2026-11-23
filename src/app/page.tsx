@@ -5,8 +5,8 @@ import dynamic from "next/dynamic";
 import Logo from "@/components/Logo";
 import type { AvatarState } from "@/components/Avatar3D";
 import {
-  Brain, ChevronDown, Cpu, Database, History, Lock, Menu,
-  MessagesSquare, Paperclip, Plus, Send, Server, Sparkles, Zap, Copy, Check,
+  Brain, ChevronDown, History, Lock, Menu,
+  MessagesSquare, Plus, Send, Server, Sparkles, Zap, Copy,
 } from "lucide-react";
 
 const Avatar3D = dynamic(() => import("@/components/Avatar3D"), {
