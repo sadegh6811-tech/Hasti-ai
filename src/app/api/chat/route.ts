@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
     if (messages.length === 0) return NextResponse.json({ error: "No message" }, { status: 400 });
 
     if (!GROQ_API_KEY) {
-      throw new Error("کلید GROQ_API_KEY در Vercel تنظیم نشده است!");
+      throw new Error("کلید GROQ_API_KEY در تنظیمات Vercel یافت نشد.");
     }
 
     const lastUserMessage = messages[messages.length - 1].content || "";
@@ -34,17 +34,13 @@ export async function POST(req: NextRequest) {
           jossContext = `\n\n[داده‌های موتور JOSS]:\nفرمول: ${jossData.equation}\nدقت (R2): ${jossData.r2}\nموتور: ${jossData.engine_used}`;
         }
       } catch (err) {
-        console.error("⚠️ JOSS Error:", err);
-        jossContext = `\n\n[خطا در اتصال به JOSS. لطفا تونل Pinggy را چک کنید]`;
+        jossContext = `\n\n[خطا: تونل JOSS قطع است یا در دسترس نیست.]`;
       }
     }
 
     const systemPrompt = {
       role: "system",
-      content: `You are Hestia (هستی), a private AI assistant. 
-You must answer natively in Persian. Be helpful, polite, and concise.
-If the user asks a scientific question and [JOSS data] is provided below, you MUST use the exact formula and R2 score in your answer.
-${jossContext}`
+      content: `You are Hestia (هستی), a private AI assistant. Answer natively in Persian. Be helpful and concise. ${jossContext}`
     };
 
     const llmRes = await fetch("https://api.groq.com/openai/v1/chat/completions", {
@@ -62,16 +58,14 @@ ${jossContext}`
 
     if (!llmRes.ok) {
       const errText = await llmRes.text();
-      throw new Error(`خطای Groq: ${llmRes.status} - ${errText}`);
+      throw new Error(`Groq API Error (${llmRes.status}): ${errText}`);
     }
 
     const llmData = await llmRes.json();
-    const assistantReply = llmData.choices[0].message;
+    return NextResponse.json({ message: llmData.choices[0].message });
 
-    return NextResponse.json({ message: assistantReply });
-
-  } catch (error: any) {
-    console.error("Server Error:", error.message);
-    return NextResponse.json({ error: error.message || "Server Error" }, { status: 500 });
+  } catch (error: unknown) {
+    const msg = error instanceof Error ? error.message : "Server Error";
+    return NextResponse.json({ error: msg }, { status: 500 });
   }
 }
