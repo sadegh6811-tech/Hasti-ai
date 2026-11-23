@@ -64,7 +64,14 @@ export default function HomePage() {
         body: JSON.stringify({ messages: newMessages.map(m => ({ role: m.role, content: m.content })) }),
       });
 
-      const data = await res.json();
+      // جلوگیری از کرش کردن در صورت خالی بودن پاسخ
+      const textResponse = await res.text();
+      let data;
+      try {
+        data = JSON.parse(textResponse);
+      } catch {
+        throw new Error("پاسخ خالی از سرور (احتمالاً Timeout یا قطعی تونل)");
+      }
 
       if (!res.ok) {
         throw new Error(data.error || "خطای ناشناخته از سرور");
